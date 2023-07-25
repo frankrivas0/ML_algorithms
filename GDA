@@ -1,0 +1,88 @@
+import numpy as np
+import math
+
+class GDA:
+    def __init__(self, x, y):
+        self.x = np.array(x)
+        self.y = np.array(y)
+        self.phi = 0
+        self.d = x.shape[1]
+        self.u0 = np.zeros(self.d)
+        self.u1 = np.zeros(self.d)
+        self.cov = np.zeros((self.d, self.d))
+        self.trained = False
+        
+
+    def predict(self, xi):
+        '''
+        Computes the conditional probability of x given y = 0 or y = 1, given u0 or u1
+        Args:
+        xi (narray (d,1))       : feature vector
+        u0 (narray (d,1))       : mean vector of x where y=0
+        u1 (narray (d,1))       : mean vector of x where y=1
+        cov (narray (d,d))      : covariance matrix
+        phi (scalar)            : proportion of y=1 values in data
+        Returns:
+        p (scalar)              : predicted value 0 or 1
+        '''
+        if self.trained:
+            u0 = self.u0
+            u1 = self.u1
+            # compute probabilities p(y=1) and p(y=0)
+            py1 = self.phi
+            py0 = 1 - self.phi
+            # compute determinant and inverse of covariance matrix
+            cov_det = np.linalg.det(self.cov)
+            cov_inv = np.linalg.inv(self.cov)
+            # compute denominator in Gaussian Multivariate Distribution
+            div = ((2*math.pi)**(self.d/2))*(cov_det**0.5)
+            # compute conditional probabilities p(x|y=0) and p(x|y=1)
+            p0 = math.exp(-0.5*np.linalg.multi_dot([(xi-u0).T, cov_inv, xi-u0]))/div
+            p1 = math.exp(-0.5*np.linalg.multi_dot([(xi-u1).T, cov_inv, xi-u1]))/div
+            # compute p(y|x) according to Bayes Rule, omit denominator p(x)
+            # predict 0 if p(y=0|xi)>p(y=1|xi)
+            # predict 1 otherwise
+            if p0*py0 > p1*py1:
+                p = 0
+            else:
+                p = 1
+        else:
+            raise Exception("Model not trained")
+
+        return p
+
+    def train(self):
+        '''
+        Computes parameters phi, u0, u1, and covariance matrix for GDA
+        Args:
+        x (narray (n,d))      : Matrix with n observation with d features
+        y (narray (n,1))      : Vector of n observations with values 0 or 1
+        Returns:
+        phi (scalar)          : Parameter of Bernoulli distribution
+        u0 (narray (d,1))     : Mean vector of x when y = 0
+        u1 (narray (d,1))     : Mean vector of x when y = 1
+        cov (narray (d,d))    : Covariance matrix that maximizes GDA
+        '''   
+        x = self.x
+        y = self.y
+        
+        # Compute parameter phi
+        n = len(y)
+        self.phi = np.mean(y)
+
+        # Compute x mean vectors
+        u0 = np.mean(x[np.where(y==0)], axis=0)
+        u1 = np.mean(x[np.where(y==1)], axis=0)
+
+        u = np.tile(np.array([u0, u1]), (n,1)).reshape(n, 2, len(u0))
+        u = u[np.arange(n), y] # u is a vector whose elements are u0 where y=0 and u1 where y=1
+
+        # Compute covariance matrix
+        cov = np.matmul((x-u).T, x-u)/n
+        
+        self.u0 = u0
+        self.u1 = u1
+        self.cov = cov
+        self.trained = True
+
+        return "Model trained correctly"
