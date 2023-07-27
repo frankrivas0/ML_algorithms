@@ -117,31 +117,38 @@ class LogisticRegressionFR:
         return J_history, w_history
         
     
-    def predict(self, x):
+    def predict(self, x, threshold=0.5):
         """
         Predict whether the label is 0 or 1 using learned logistic
         regression parameters w
 
         Args:
-          x : (ndarray (n,1)) data n features
-          w : (ndarray (n,))  values of parameters of the model      
-          b : (scalar)        value of bias parameter of the model
+          x (ndarray (n,1))                : data with n features
+          threshold (scalar, default=0.5)  : Probability separating 0 and 1 outputs      
 
         Returns:
-          p : (scalar) The prediction for x using a threshold at 0.5
+          p (scalar)  : The prediction for x using a threshold
         """
       
         hx = self.sigmoid(np.dot(x, self.w) + self.b)
-        if hx >= 0.5:
+        if hx >= threshold:
             p = 1
         else:
             p = 0
  
         return p
     
-    def compute_accuracy(self, x_test, y_test):
-        
+    def compute_accuracy(self, x_test, y_test, threshold=0.5):
+        """
+        Computes the accuracy of the model given a threshold.
+        Predicts 1 if hx = sigmoid(w.x+b) >= threshold,
+        predicts 0 otherwise. Saves the accuracy in accuracy attribute
+        Args:
+         x_test (ndarray (m,n))           : Matrix with test observations
+         y_test (ndarray (m,))            : Vector with outputs for each obervation
+         threshold (scalar, default=0.5)  : Probability separating 0 and 1 outputs
+        """
         p = np.zeros(self.m)
-        f = self.sigmoid(np.dot(x_test, self.w) + self.b)
-        p = np.array([1 if i>=0.5 else 0 for i in f])
+        hx = self.sigmoid(np.dot(x_test, self.w) + self.b)
+        p = np.array([1 if i>=threshold else 0 for i in hx])
         self.accuracy = (np.mean(p == y_test) * 100)
