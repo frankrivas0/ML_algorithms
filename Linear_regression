@@ -1,0 +1,93 @@
+import numpy as np
+class LinearRegressionFR:
+  
+    def __init__(self, x, y):
+        self.x = np.array(x)
+        self.y = np.array(y)
+        self.m = x.shape[0]
+        self.n = x.shape[1]
+        self.b = 0
+        self.w = np.zeros(self.n)
+        self.J_hist = []
+       
+    def predict(self, x):
+        """
+        This function return the predicted value of y (hx)
+    
+        Args:
+            x (ndarray (n,1))     : input data, n features
+            w (ndarray(n,1))      : parameters of the model
+            b (scalar)            : intercept of the linear model
+        
+        Returns:
+            hx (scalar)           : predicted value
+        """        
+        hx = np.dot(x, self.w) + self.b
+        
+        return hx
+    
+    def compute_gradient(self, w, b, lambda_=0):
+        """
+        Computes the gradient for linear regression 
+        Args:
+          x (ndarray (m,n)): Data, m examples with n features
+          y (ndarray (m,)) : target values
+          w (ndarray (n,)) : model parameters  
+          b (scalar)       : model parameter
+
+        Returns:
+          dj_dw (ndarray (n,)): The gradient of the cost w.r.t. the parameters w. 
+          dj_db (scalar):       The gradient of the cost w.r.t. the parameter b. 
+        """
+
+        m = self.m
+        err = (np.matmul(self.x,w) + b) - self.y
+
+        dj_dw = np.matmul(np.transpose(self.x), err) / m + (lambda_/m)*w
+        dj_db = np.sum(err) / m
+
+        return dj_dw, dj_db
+    
+    def compute_cost(self, w, b):
+        """
+        Computes the cost function for linear regression 
+        Args:
+          w (ndarray (n,)) : model parameters  
+          b (scalar)       : model parameter
+
+        Returns:
+          J (scalar)       : cost value  
+        """
+        J = np.sum(((np.matmul(self.x, w) + b) - self.y)**2)/(2 * self.m)
+        
+        return J
+    
+    def train(self, alpha, num_iter, lambda_=0):
+        """
+        Trains the linear regression model with gradiend descent.
+        Saves learned parameters and cost history to class attributes
+        w, b, j_hist.
+        Args:
+          alpha (scalar (float))        : learning rate of gradient descent  
+          num_iter (scalar (integer))   : number of iterations
+          lambda_ (scalar (float))      : parameter for l2 regularization
+        Returns:
+        
+        """
+        # Initialize parameters
+        w = np.zeros(self.n)
+        b = 0
+        j_hist = []
+        
+        for i in range(num_iter):
+            # Compute gradients
+            dj_dw,dj_db = self.compute_gradient(w, b, lambda_)
+            # Update parameters
+            w = w - alpha*dj_dw
+            b = b - alpha*dj_db
+            # Compute and save cost
+            j_hist.append(self.compute_cost(w, b))
+        # Save learned parameters and cost history
+        self.w = w
+        self.b = b
+        self.J_hist = j_hist
