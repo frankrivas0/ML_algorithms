@@ -1,7 +1,15 @@
-import numpy as np
 import math
+import numpy as np
 
 class LogisticRegressionFR:
+    """
+    This class performs binary classification y = {0, 1}, with the logistic
+    regression algorithm, optimized with gradient descent and applying
+    l1 regularization.
+    It has to be initialized with the training data x and y, and then
+    perform the train method to run the gradient descent algorithm.
+    The accuracy of the model can be computed with the method compute_accuracy.
+    """
     
     def __init__(self, x, y):
         self.x = np.array(x)
@@ -22,7 +30,7 @@ class LogisticRegressionFR:
     def compute_gradient(self, w, b, lambda_=0):
         """
         Computes the gradient for logistic regression. Divides each gradiend by m.
-        Applies l2 regularization via lambda coefficient
+        Applies l1 regularization via lambda coefficient
 
         Args:
           X : (ndarray Shape (m,n)) data, m examples by n features
@@ -41,7 +49,7 @@ class LogisticRegressionFR:
         err = hx - self.y # m array
         dj_db = np.mean(err) # scalar
         dj_dw = np.dot(np.transpose(self.x), err)/self.m # (n,m) x (m,1) = n,1 array
-        # apply l2 regularization to w
+        # apply l1 regularization to w
         dj_dw = dj_dw + lambda_*w/self.m
         
         return dj_db, dj_dw
