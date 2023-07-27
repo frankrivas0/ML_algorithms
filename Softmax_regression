@@ -1,0 +1,143 @@
+import numpy as np 
+class SOFTMAX:
+    """
+    Performs multivariable classification using the softmax regression model.
+    The model computes the probability p(y=i|x) for i in {1, ..., k}, and
+    predicts the i with the highest probability.
+    It has to be initialize with the matrix x with n input vectors each with
+    d features, and the vector y with the output labels {1,..., k}.
+    After initialization, the model must be trained with the train method given
+    a learning rate alpha and a number of iterations.
+    To make predictios with the model, the method predict can be used. It
+    takes a vector or matrix x with input features.
+    """
+    def __init__(self, x, y):
+        
+        self.x = x
+        self.y = y
+        self.k_values = np.unique(y)
+        self.k = len(self.k_values)
+        self.d = x.shape[1]
+        self.n = x.shape[0]
+        self.w, self.b = self.wb_init(self.k_values, x, y)
+        self.optimized = False
+        
+    
+    def wb_init(self, k_values, x, y):
+        '''
+        Computes the initial values of W and B for training softmax regression model.
+        W is the mean of x vectors corresponding to each k value, and B is a zero vector.
+        Args:
+        k_values (ndarray)              : unique values in vector y
+        x (ndarray (n,d))               : Matrix with n examples, each with d features
+        y (ndarray (n, 1))              : Array with n observations, k possible values (1, ..., k)
+        Returns:
+        Win (ndarray (k, d))            : Initial Matrix of parameters [w1, w2, ..., wk], each (d,1) narray
+        Bin (ndarray (k, 1))            : Initial Vector with intercepts [b1, b2, ..., bk]    
+        '''
+        w_in = np.zeros((self.k, self.d))
+        for i in range(self.k - 1):
+            w_in[i] = np.mean(x[np.where(y == k_values[i])])
+        b_in = np.zeros(self.k)
+        return w_in, b_in
+    
+    def one_hot_y(self):
+        """
+        Computes matrix m_encod, y[i] = j, m_encod[i, j] = 1
+        """
+        m_encod = np.zeros((self.n, self.k))
+        m_encod[np.arange(self.n), self.y - 1] = 1
+        return m_encod
+    
+    def phi(self, x, W, B):
+        '''
+        Computes the conditional probability p(y=k|x;W,B) for all k's
+        given a vector x (d,1) or matrix x (n,d), vectors w in matrix W, and vector B.
+        Args:
+        x (ndarray (d, 1) or (n,d))       : d features vector, real valued
+        W (ndarray (k, d))                : parameters. k possible outcomes, d features
+        B (ndarray (k, 1))                : intercept. k possible outcomes
+        Returns:
+        phi (ndarray (k, 1) or (n,k))     : k possible outcomes
+        '''
+        
+        try:
+            x.shape[1]
+        except:
+            eta = np.exp(np.matmul(W, x) + B, dtype='float64')
+            phi = eta/np.sum(eta)        
+        else:
+            eta = np.exp(np.matmul(W, x.T) + B.reshape((self.k, 1)), dtype='float64')
+            phi = eta/np.sum(eta, axis=0)
+            phi = phi.T
+
+        return phi
+    
+    def softmax_update_WB(self, W, B, alpha):
+        '''
+        Args:
+        X (ndarray (n,d))               : Matrix with n examples, each with d features
+        y (ndarray (n, 1))              : Array with n observations, k possible values (1, ..., k)
+        W (ndarray (k, d))              : Matrix of parameters [w1, w2, ..., wk], each (d,1) narray
+        B (ndarray (k, 1))              : Vector with intercepts [b1, b2, ..., bk]
+        alpha (scalar)                 : Learning rate for gradient descent
+        Returns:
+        W (ndarray (k, d))              : One update of Matrix of parameters [w1, w2, ..., wk], each (d,1) narray
+        B (ndarray (k, 1))              : One update of Vector with intercepts [b1, b2, ..., bk]
+        '''     
+        phis = self.phi(self.x, W, B)
+        y_enc = self.one_hot_y()
+        
+        grad_w = np.matmul((y_enc - phis).T, self.x)
+        grad_b = np.sum(y_enc - phis, axis = 0)
+        
+        W = W + alpha*grad_w
+        B = B + alpha*grad_b
+        J = -np.mean(np.log(phis[np.arange(self.n), self.y-1]))
+        
+        return W, B, J
+    
+    def train(self, alpha, num_iters):
+        """
+        Optimize w and b with gradient descent, and saves them to model attributes.
+        Args:
+        alpha (scalar)                 : Learning rate for gradient descent
+        num_iters (scalar)             : Number of iterations
+        
+        Returns:
+        params_hist (list)             : Parameters in each iteration
+        cost (list)                    : Cost in each iteration
+        """
+        W = self.w
+        B = self.b
+
+        params_hist = []
+        cost = []
+
+        for i in range(num_iters):
+
+            W, B, J = self.softmax_update_WB(W, B, alpha)
+            params_hist.append([W, B])
+            cost.append(J)
+        
+        self.w = W
+        self.b = B
+        self.optimized = True
+
+        return params_hist, cost
+    
+    def predict(self, x):
+        """
+        Computes the probability p(y=i|x) for i in {1, ..., k}, and
+        predicts the i with the highest probability.
+        Args:
+         x (ndarray (d, 1) or (n,d))       : d features vector, real valued
+        
+        """
+        if self.optimized:
+            phis = self.phi(x, self.w, self.b)
+            y_predicted = np.argmax(phis, axis=1) + 1
+        else:
+            raise Exception("Model not optimized")
+        
+        return y_predicted
