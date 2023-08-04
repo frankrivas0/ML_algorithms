@@ -1,0 +1,177 @@
+import numpy as np
+import pandas as pd
+import time
+
+class SVM:
+    kernels = ('linear', 'poly', 'radial')
+    
+    def __init__(self, kernel='linear', C=100, degree=2, const=1,
+                 sigma=1, eps=0.0001, tol=0.1):
+        
+        if not kernel in SVM.kernels:
+            raise ValueError(f'{kernel} is not a valid kernel')
+        
+        self.k_func = self.linear
+        self.C = C
+        self.degree = degree
+        self.const = const
+        self.sigma = sigma
+        self.eps = eps
+        self.tol = tol
+        self.optimized = False
+    
+    def linear(self, xi, xj):
+        return np.dot(xi, xj)
+    
+    def poly(self, xi, xj):
+        return (np.dot(xi, xj) + self.const)**self.degree
+    
+    def radial(self, xi, xj):
+        return np.exp(-np.linalg.norm(xi - xj)**2/(2*self.sigma**2))
+    
+    def hx(self, xi, alpha, b):
+        return np.sum(alpha*self.y*self.k_func(self.x, xi)) + b
+    
+    def one_update(self, i, j, alpha, b):
+        if i==j:
+            return 0, alpha, b
+        
+        C = self.C
+        ai_old = alpha[i]
+        aj_old = alpha[j]
+        xi = self.x[i]
+        xj = self.x[j]
+        yi = self.y[i]
+        yj = self.y[j]
+
+        if yi == yj:
+            L = max(0, ai_old + aj_old - C)
+            H = min(C, ai_old + aj_old)
+        else:
+            L = max(0, aj_old - ai_old)
+            H = min(C, C + aj_old - ai_old)
+
+        if L==H:
+            return 0, alpha, b
+
+        Ei = self.hx(xi, alpha, b) - yi
+        Ej = self.hx(xj, alpha, b) - yj
+        eta = 2*self.k_func(xi,xj) - self.k_func(xi,xi) - self.k_func(xj,xj)   
+
+        if eta<0:
+            aj_new = aj_old - yj*(Ei-Ej)/eta
+            if aj_new > H:
+                aj_new = H
+            elif aj_new < L:
+                aj_new = L
+        else:
+            return 0, alpha, b
+            # deal with the case when eta>=0
+
+        if abs(aj_new - aj_old) < self.eps*(aj_new + aj_old + self.eps):
+            return 0, alpha, b
+
+        ai_new = ai_old + yi*yj*(aj_old - aj_new)
+
+        # save new alphas
+        alpha[i] = ai_new
+        alpha[j] = aj_new
+        # compute b1 and b2
+        b1 = b - Ei - yi*(ai_new-ai_old)*self.k_func(xi,xi) - yj*(aj_new-aj_old)*self.k_func(xi,xj)
+        b2 = b - Ej - yi*(ai_new-ai_old)*self.k_func(xi,xj) - yj*(aj_new-aj_old)*self.k_func(xj,xj)
+        if ai_new>0 and ai_new<C:
+            b = b1
+        elif aj_new>0 and aj_new<C:
+            b = b2
+        else:
+            b = (b1+b2)/2
+
+        return 1, alpha, b
+    
+    def one_loop(self, j, alpha, b):
+        
+        # check if aj violates KKT conds.
+        aj = alpha[j]
+        yj = self.y[j]
+        xj = self.x[j]
+        Ej = self.hx(xj, alpha, b) - yj
+        if (((Ej*yj<-self.tol) and (aj<self.C)) or ((Ej*yj>self.tol) and (aj>0))):
+
+            # first heuristic
+
+            # loop through all non zero and non C alpha, start at random
+            index = np.where((alpha!=0) & (alpha!=self.C))[0]
+            if len(index)>1:
+                np.random.shuffle(index)
+                for i in index:
+                    passes, alpha, b = self.one_update(i, j, alpha, b)
+                    if passes == 1:
+                        return 1, alpha, b
+
+            # loop through all alpha, start at random
+            m = len(alpha)
+            index = np.random.permutation(m)
+            for i in index:
+                passes, alpha, b = self.one_update(i, j, alpha, b)
+                if passes == 1:
+                    return 1, alpha, b
+
+        return 0, alpha, b
+    
+    def train(self, x, y):
+        t1 = time.time()
+        self.x = x
+        self.y = y
+        m, n = x.shape
+        alpha = np.zeros(m)
+        b = 0
+        
+        num_changed = 0
+        examine_all = 1
+        while ((num_changed > 0) or (examine_all == 1)):
+            # The while loop stops when num_changed = 0 and examine_all = 0
+            num_changed = 0
+            if examine_all == 1:
+                # Pass through entire training set
+                for j in range(m):
+                    passes, alpha, b = self.one_loop(j, alpha, b)
+                    num_changed += passes
+            else:
+                # Pass through non zero and non C alphas
+                nZnC = np.where((alpha!=0) & (alpha!=self.C))[0]
+                for j in nZnC:
+                    passes, alpha, b = self.one_loop(j, alpha, b)
+                    num_changed += passes
+
+            # Alternate between passes through the entire training set and
+            # through non zero and non C alphas
+            if examine_all == 1:
+                examine_all = 0
+            elif num_changed == 0:
+                examine_all = 1
+        
+        self.alpha = alpha
+        self.b = b
+        self.optimized = True
+        t2 = time.time()
+        
+        return print(f"Model trained successfully in: {1000*(t2-t1):.4f} ms")
+    
+    def predict(self, xi):
+        
+        if not self.optimized:
+            raise Exception("Model not trained")
+        
+        h = self.hx(xi, self.alpha, self.b)
+        if h >= 0:
+            prediction = 1
+        else:
+            prediction = -1
+            
+        return prediction
+    
+    def compute_accuracy(self, X):
+        y_predicted = []
+        for xi in X:
+            y_predicted.append(self.predict(xi))
+        return print('Train Accuracy: %f'%(np.mean(y_predicted == self.y) * 100))
